@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import date, datetime
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
@@ -27,7 +26,7 @@ sprints = cargar_csv("sprints.csv", ["Sprint", "Fecha Desde", "Fecha Hasta", "In
 historial = cargar_csv("historial.csv", ["ID Solicitud", "Fecha", "Campo", "Valor Anterior", "Valor Nuevo", "Sprint"])
 
 # ================================
-# Crear Sprint (solo al pulsar botón)
+# Crear Sprint
 # ================================
 
 with st.expander("🛠 Crear Sprint"):
@@ -121,7 +120,7 @@ if filtro_hist_sprint != "Todos":
 st.dataframe(hist_filtrado[["ID Solicitud", "Fecha", "Campo", "Valor Anterior", "Valor Nuevo"]], use_container_width=True)
 
 # ================================
-# Métricas y Gráficas
+# Métricas Resumen
 # ================================
 
 st.subheader("📊 Resumen General")
@@ -131,18 +130,4 @@ col1.metric("Solicitudes Totales", len(solicitudes))
 col2.metric("Estados únicos", len(solicitudes["Estado"].unique()))
 col3.metric("Total de actualizaciones", len(historial))
 
-st.markdown("### 📈 Gráfica por Estado")
-sprint_para_grafico = st.selectbox("📌 Seleccionar Sprint para graficar", ["Todos"] + list(sprints["Sprint"].unique()), key="grafico")
-
-df_graf = solicitudes.copy()
-if sprint_para_grafico != "Todos":
-    df_graf = df_graf[df_graf["Sprint"] == sprint_para_grafico]
-
-conteo_estados = df_graf["Estado"].value_counts()
-
-fig, ax = plt.subplots()
-conteo_estados.plot(kind='bar', color='skyblue', ax=ax)
-ax.set_ylabel("Cantidad")
-ax.set_xlabel("Estado")
-ax.set_title("Solicitudes por Estado")
-st.pyplot(fig)
+# Gráfica eliminada (antes estaba aquí)
