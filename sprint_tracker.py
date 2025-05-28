@@ -1,57 +1,116 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
-st.title("📊 Seguimiento de Sprint - Scrum Master Tool")
+# ================================
+# Funciones auxiliares
+# ================================
 
-# Intenta cargar el CSV o crea un DataFrame vacío
-def cargar_datos():
+def cargar_csv(nombre_archivo, columnas):
     try:
-        return pd.read_csv("sprint_data.csv")
+        return pd.read_csv(nombre_archivo)
     except FileNotFoundError:
-        columnas = ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover"]
         return pd.DataFrame(columns=columnas)
 
-# Guardar los datos en CSV
-def guardar_datos(df):
-    df.to_csv("sprint_data.csv", index=False)
+def guardar_csv(df, nombre_archivo):
+    df.to_csv(nombre_archivo, index=False)
 
-df = cargar_datos()
+# ================================
+# Cargar datos
+# ================================
 
-# Formulario para ingresar datos
+solicitudes = cargar_csv("sprint_data.csv", ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover"])
+sprints = cargar_csv("sprints.csv", ["Sprint", "Fecha Desde", "Fecha Hasta", "Integrantes QA", "Integrantes Dev", "Días Efectivos"])
+historial = cargar_csv("historial.csv", ["ID Solicitud", "Fecha", "Campo", "Valor Anterior", "Valor Nuevo"])
+
+# ================================
+# Sección: Crear Sprint
+# ================================
+
+st.sidebar.header("🛠 Crear Sprint")
+with st.sidebar.form("form_sprint"):
+    sprint_name = st.text_input("Nombre del Sprint (ej: Sprint 10)")
+    fecha_desde = st.date_input("Fecha desde")
+    fecha_hasta = st.date_input("Fecha hasta")
+    qa = st.number_input("Integrantes QA", min_value=0, step=1)
+    dev = st.number_input("Integrantes Desarrollo", min_value=0, step=1)
+    dias_efectivos = st.number_input("Días efectivos del sprint", min_value=1, step=1)
+
+    submit_sprint = st.form_submit_button("Guardar Sprint")
+
+    if submit_sprint:
+        nuevo_sprint = pd.DataFrame([[sprint_name, fecha_desde, fecha_hasta, qa, dev, dias_efectivos]], columns=sprints.columns)
+        sprints = pd.concat([sprints, nuevo_sprint], ignore_index=True)
+        guardar_csv(sprints, "sprints.csv")
+        st.sidebar.success("✅ Sprint guardado.")
+
+# ================================
+# Sección: Agregar/Editar Solicitud
+# ================================
+
+st.title("📌 Seguimiento de Solicitudes del Sprint")
+
 with st.form("form_solicitud"):
-    st.subheader("➕ Nueva Solicitud")
-    solicitud = st.text_input("Nombre o Descripción de la Solicitud")
-    estado = st.selectbox("Estado", ["To Do", "In Progress", "Done"])
+    st.subheader("➕ Nueva / Actualizar Solicitud")
+
+    id_edit = st.text_input("ID (dejar vacío para nueva)", "")
+    solicitud = st.text_input("Descripción de la Solicitud")
+    estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
     fecha_mov = st.date_input("Fecha del Movimiento", value=date.today())
-    sprint = st.text_input("Sprint (ej: Sprint 12)")
+    sprint = st.selectbox("Asignar a Sprint", options=[""] + list(sprints["Sprint"].unique()))
     persona = st.text_input("Persona Asignada")
-    submit = st.form_submit_button("Agregar Solicitud")
+
+    submit = st.form_submit_button("Guardar Solicitud")
 
     if submit:
-        nueva_id = len(df) + 1
-        carryover = "Sí" if sprint != f"Sprint {((nueva_id - 1) // 10) + 1}" else "No"  # lógica simple de ejemplo
-        nuevo_registro = pd.DataFrame([[nueva_id, solicitud, estado, fecha_mov, sprint, persona, carryover]],
-                                      columns=df.columns)
-        df = pd.concat([df, nuevo_registro], ignore_index=True)
-        guardar_datos(df)
-        st.success("✅ Solicitud agregada correctamente.")
+        hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if id_edit:
+            # Editar
+            idx = solicitudes[solicitudes["ID"] == int(id_edit)].index
+            if not idx.empty:
+                i = idx[0]
+                campos = ["Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona"]
+                valores_nuevos = [solicitud, estado, str(fecha_mov), sprint, persona]
+                for campo, nuevo in zip(campos, valores_nuevos):
+                    anterior = str(solicitudes.loc[i, campo])
+                    if anterior != nuevo:
+                        historial = pd.concat([historial, pd.DataFrame([[id_edit, hoy, campo, anterior, nuevo]], columns=historial.columns)], ignore_index=True)
+                        solicitudes.loc[i, campo] = nuevo
+                guardar_csv(solicitudes, "sprint_data.csv")
+                guardar_csv(historial, "historial.csv")
+                st.success("📝 Solicitud actualizada.")
+            else:
+                st.warning("⚠️ ID no encontrado.")
+        else:
+            nuevo_id = 1 if solicitudes.empty else int(solicitudes["ID"].max()) + 1
+            carryover = "No"  # inicial
+            nueva = pd.DataFrame([[nuevo_id, solicitud, estado, fecha_mov, sprint, persona, carryover]], columns=solicitudes.columns)
+            solicitudes = pd.concat([solicitudes, nueva], ignore_index=True)
+            guardar_csv(solicitudes, "sprint_data.csv")
+            st.success("✅ Solicitud agregada.")
 
-# Mostrar datos
+# ================================
+# Mostrar Solicitudes
+# ================================
+
 st.subheader("📋 Solicitudes Registradas")
-st.dataframe(df, use_container_width=True)
+st.dataframe(solicitudes, use_container_width=True)
 
-# Métricas básicas
-st.subheader("📈 Resumen del Sprint")
+# ================================
+# Mostrar Historial de Cambios
+# ================================
+
+st.subheader("🕒 Historial de Actualizaciones")
+st.dataframe(historial.sort_values(by="Fecha", ascending=False), use_container_width=True)
+
+# ================================
+# Métricas
+# ================================
+
+st.subheader("📊 Resumen General")
 col1, col2, col3 = st.columns(3)
-col1.metric("Total de Solicitudes", len(df))
-col2.metric("Completadas (Done)", len(df[df["Estado"] == "Done"]))
-col3.metric("Carryovers", len(df[df["Carryover"] == "Sí"]))
-
-# Filtros (opcional)
-with st.expander("🔍 Filtros"):
-    sprint_filtrado = st.selectbox("Filtrar por Sprint", ["Todos"] + sorted(df["Sprint"].unique()))
-    if sprint_filtrado != "Todos":
-        st.dataframe(df[df["Sprint"] == sprint_filtrado])
+col1.metric("Solicitudes Totales", len(solicitudes))
+col2.metric("Estados únicos", len(solicitudes["Estado"].unique()))
+col3.metric("Total de actualizaciones", len(historial))
