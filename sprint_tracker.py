@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime
+from datetime import datetime
 import os
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
@@ -45,7 +45,7 @@ with st.expander("🛠 Crear Sprint"):
         qa = st.number_input("Integrantes QA", min_value=0)
         dev = st.number_input("Integrantes Desarrollo", min_value=0)
         dias_efectivos = st.number_input("Días efectivos del sprint", min_value=1)
-        submit_sprint = st.form_submit_button("Guardar Sprint")  # Asegúrate de que esté dentro del form
+        submit_sprint = st.form_submit_button("Guardar Sprint")
         if submit_sprint:
             sprints = pd.concat([sprints, pd.DataFrame([[sprint_name, fecha_desde, fecha_hasta, qa, dev, dias_efectivos]], columns=sprints.columns)], ignore_index=True)
             guardar_csv(sprints, "sprints.csv")
@@ -60,12 +60,12 @@ with st.expander("🆕 Crear Nueva Solicitud"):
         solicitud = st.text_input("Descripción")
         tipo = st.selectbox("Tipo de Solicitud", ["Historia de usuario", "Deuda Técnica", "Defecto"])
         estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
-        fecha_mov = st.date_input("Fecha de Movimiento", value=date.today())
+        fecha_mov = st.date_input("Fecha de Movimiento", value=datetime.today().date())
         sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()))
         carryover = st.checkbox("¿Es Carryover?")
         puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
         puntos_dev = st.selectbox("Puntos Dev", fibonacci_options)
-        puntos_finales = st.selectbox("Puntos Finales", fibonacci_options)  # Agregado
+        puntos_finales = st.selectbox("Puntos Finales", fibonacci_options)
         compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"])
 
         id_hu = ""
@@ -74,7 +74,7 @@ with st.expander("🆕 Crear Nueva Solicitud"):
             id_hu = st.text_input("ID HU Relacionada (opcional)")
             tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5)
 
-        submit_crear_solicitud = st.form_submit_button("Guardar Nueva Solicitud")  # Asegúrate de que esté dentro del form
+        submit_crear_solicitud = st.form_submit_button("Guardar Nueva Solicitud")
         if submit_crear_solicitud:
             hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             if not id_nuevo.isdigit():
@@ -85,8 +85,7 @@ with st.expander("🆕 Crear Nueva Solicitud"):
                 fila = [
                     int(id_nuevo), solicitud, tipo, estado, fecha_mov, sprint,
                     "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev),
-                    str(puntos_finales),  # Agregar Puntos Finales
-                    compromiso, id_hu, tiempo_res
+                    str(puntos_finales), compromiso, id_hu, tiempo_res
                 ]
                 nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
                 solicitudes = pd.concat([solicitudes, nueva_df], ignore_index=True)
@@ -97,28 +96,31 @@ with st.expander("🆕 Crear Nueva Solicitud"):
                 guardar_csv(historial, "historial.csv")
                 st.success("✅ Solicitud creada.")
 
+# Modificar Solicitud Existente
 with st.expander("✏️ Modificar Solicitud Existente"):
     with st.form("form_modificar_solicitud"):
+        # Paso 1: Ingresar el ID de la solicitud a modificar
         id_edit = st.text_input("ID de Solicitud existente a modificar")
 
+        # Paso 2: Consultar y cargar los datos de la solicitud
         if id_edit and id_edit.isdigit() and int(id_edit) in solicitudes["ID"].values:
             solicitud_data = solicitudes[solicitudes["ID"] == int(id_edit)].iloc[0]
-            st.write("**Descripción:**", solicitud_data["Solicitud"])
-            st.write("**Tipo de Solicitud:**", solicitud_data["Tipo Solicitud"])
+            st.write("**Descripción (No editable):**", solicitud_data["Solicitud"])
 
+            # Paso 3: Modificar los demás campos
             estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"], index=["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"].index(solicitud_data["Estado"]))
             fecha_mov = st.date_input("Fecha de Movimiento", value=pd.to_datetime(solicitud_data["Fecha Movimiento"]))
             sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()), index=0 if solicitud_data["Sprint"] == "" else list(sprints["Sprint"].unique()).index(solicitud_data["Sprint"]))
             carryover = st.checkbox("¿Es Carryover?", value=(solicitud_data["Carryover"] == "Sí"))
             puntos_qa = st.selectbox("Puntos QA", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos QA"]) if solicitud_data["Puntos QA"] in fibonacci_options else 0)
             puntos_dev = st.selectbox("Puntos Dev", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos Dev"]) if solicitud_data["Puntos Dev"] in fibonacci_options else 0)
-            puntos_finales = st.selectbox("Puntos Finales", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos Finales"]) if solicitud_data["Puntos Finales"] in fibonacci_options else 0)  # Agregado
+            puntos_finales = st.selectbox("Puntos Finales", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos Finales"]) if solicitud_data["Puntos Finales"] in fibonacci_options else 0)
             compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"], index=["Desarrollo", "QA", "Ambos"].index(solicitud_data["Compromiso"]))
 
             id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
             tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) and solicitud_data["Tiempo Resolución (h)"] != "" else 0.0)
 
-            submit_modificar_solicitud = st.form_submit_button("Guardar Cambios")  # Asegúrate de que esté dentro del form
+            submit_modificar_solicitud = st.form_submit_button("Guardar Cambios")
             if submit_modificar_solicitud:
                 hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 idx = solicitudes[solicitudes["ID"] == int(id_edit)].index[0]
@@ -135,48 +137,6 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                 guardar_csv(solicitudes, "sprint_data.csv")
                 guardar_csv(historial, "historial.csv")
                 st.success("✅ Solicitud modificada exitosamente.")
-        elif id_edit:
-            st.warning("⚠️ El ID no existe o no es válido.")
-
-# Mostrar solicitudes
-st.subheader("📋 Solicitudes Registradas")
-
-filtro_sprint = st.selectbox("🔎 Filtrar por Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
-filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].unique()))
-filtro_id = st.text_input("🔍 Buscar por ID")
-
-df_filtrado = solicitudes.copy()
-if filtro_sprint != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Sprint"] == filtro_sprint]
-if filtro_estado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Estado"] == filtro_estado]
-if filtro_id:
-    df_filtrado = df_filtrado[df_filtrado["ID"].astype(str).str.contains(filtro_id.strip())]
-
-st.dataframe(df_filtrado, use_container_width=True)
-
-# Resumen
-st.subheader("📊 Resumen General por Sprint")
-
-resumen = df_filtrado.copy()
-resumen["Puntos QA"] = pd.to_numeric(resumen["Puntos QA"].replace("No aplica", 0), errors="coerce").fillna(0)
-resumen["Puntos Dev"] = pd.to_numeric(resumen["Puntos Dev"].replace("No aplica", 0), errors="coerce").fillna(0)
-resumen["Puntos Finales"] = pd.to_numeric(resumen["Puntos Finales"].replace("No aplica", 0), errors="coerce").fillna(0)
-resumen["Tiempo Resolución (h)"] = pd.to_numeric(resumen["Tiempo Resolución (h)"], errors="coerce").fillna(0)
-
-if not resumen.empty:
-    resumen_agg = resumen.groupby("Sprint").agg(
-        Total_Solicitudes=("ID", "nunique"),
-        Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
-        Puntos_QA=("Puntos QA", "sum"),
-        Puntos_Dev=("Puntos Dev", "sum"),
-        Puntos_Finales=("Puntos Finales", "sum"),
-        QA_only=("Compromiso", lambda x: (x == "QA").sum()),
-        Dev_only=("Compromiso", lambda x: (x == "Desarrollo").sum()),
-        Ambos=("Compromiso", lambda x: (x == "Ambos").sum()),
-        Tiempo_Resolucion_Prom=("Tiempo Resolución (h)", "mean")
-    ).reset_index()
-
-    st.dataframe(resumen_agg, use_container_width=True)
-else:
-    st.info("⚠️ No hay datos para mostrar.")
+        else:
+            if id_edit:
+                st.warning("⚠️ El ID no existe o no es válido.")
