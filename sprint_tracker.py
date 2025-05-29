@@ -116,7 +116,7 @@ with st.expander("✏️ Modificar Solicitud Existente"):
             id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
             tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) and solicitud_data["Tiempo Resolución (h)"] != "" else 0.0)
 
-            if st.form_submit_button("Guardar Cambios"):
+            if st.form_submit_button("Guardar Cambios"):  # Aquí es donde se guarda la solicitud modificada
                 hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 idx = solicitudes[solicitudes["ID"] == int(id_edit)].index[0]
                 solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Puntos Finales", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
@@ -139,4 +139,12 @@ with st.expander("✏️ Modificar Solicitud Existente"):
 st.subheader("📋 Solicitudes Registradas")
 
 filtro_sprint = st.selectbox("🔎 Filtrar por Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
-filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].
+filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].unique()))
+
+# Mostrar las solicitudes filtradas
+if filtro_sprint != "Todos":
+    solicitudes = solicitudes[solicitudes["Sprint"] == filtro_sprint]
+if filtro_estado != "Todos":
+    solicitudes = solicitudes[solicitudes["Estado"] == filtro_estado]
+
+st.dataframe(solicitudes)
