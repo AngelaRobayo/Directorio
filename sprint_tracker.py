@@ -17,16 +17,19 @@ def cargar_csv(nombre_archivo, columnas):
 def guardar_csv(df, nombre_archivo):
     df.to_csv(nombre_archivo, index=False)
 
+fibonacci_options = ["No aplica", 1, 2, 3, 5, 8, 13, 21]
+
 # ================================
 # Cargar datos
 # ================================
 
-solicitudes = cargar_csv("sprint_data.csv", ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover"])
+columnas_base = ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover", "Puntos QA", "Puntos Dev"]
+solicitudes = cargar_csv("sprint_data.csv", columnas_base)
 sprints = cargar_csv("sprints.csv", ["Sprint", "Fecha Desde", "Fecha Hasta", "Integrantes QA", "Integrantes Dev", "Días Efectivos"])
-historial = cargar_csv("historial.csv", ["ID Solicitud", "Fecha", "Campo", "Valor Anterior", "Valor Nuevo", "Sprint"])
+historial = cargar_csv("historial.csv", columnas_base + ["Fecha Cambio", "Cambio"])
 
 # ================================
-# Crear Sprint
+# Crear Sprint (expander)
 # ================================
 
 with st.expander("🛠 Crear Sprint"):
@@ -37,7 +40,6 @@ with st.expander("🛠 Crear Sprint"):
         qa = st.number_input("Integrantes QA", min_value=0, step=1)
         dev = st.number_input("Integrantes Desarrollo", min_value=0, step=1)
         dias_efectivos = st.number_input("Días efectivos del sprint", min_value=1, step=1)
-
         submit_sprint = st.form_submit_button("Guardar Sprint")
 
         if submit_sprint:
@@ -61,22 +63,29 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
         sprint = st.selectbox("Asignar a Sprint", options=[""] + list(sprints["Sprint"].unique()))
         persona = st.text_input("Persona Asignada")
         carryover = st.checkbox("¿Es Carryover?")
+        puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
+        puntos_dev = st.selectbox("Puntos Desarrollo", fibonacci_options)
 
         submit = st.form_submit_button("Guardar Solicitud")
 
         if submit:
             hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            puntos_qa_str = str(puntos_qa)
+            puntos_dev_str = str(puntos_dev)
+
             if id_edit:
                 idx = solicitudes[solicitudes["ID"] == int(id_edit)].index
                 if not idx.empty:
                     i = idx[0]
-                    campos = ["Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover"]
-                    valores_nuevos = [solicitud, estado, str(fecha_mov), sprint, persona, "Sí" if carryover else "No"]
-                    for campo, nuevo in zip(campos, valores_nuevos):
-                        anterior = str(solicitudes.loc[i, campo])
-                        if anterior != nuevo:
-                            historial = pd.concat([historial, pd.DataFrame([[id_edit, hoy, campo, anterior, nuevo, sprint]], columns=historial.columns)], ignore_index=True)
-                            solicitudes.loc[i, campo] = nuevo
+                    old_row = solicitudes.loc[i].copy()
+                    solicitudes.loc[i] = [int(id_edit), solicitud, estado, fecha_mov, sprint, persona,
+                                          "Sí" if carryover else "No", puntos_qa_str, puntos_dev_str]
+
+                    cambio = pd.Series(solicitudes.loc[i])
+                    cambio["Fecha Cambio"] = hoy
+                    cambio["Cambio"] = "Actualización"
+                    historial = pd.concat([historial, pd.DataFrame([cambio])], ignore_index=True)
+
                     guardar_csv(solicitudes, "sprint_data.csv")
                     guardar_csv(historial, "historial.csv")
                     st.success("📝 Solicitud actualizada.")
@@ -84,9 +93,18 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
                     st.warning("⚠️ ID no encontrado.")
             else:
                 nuevo_id = 1 if solicitudes.empty else int(solicitudes["ID"].max()) + 1
-                nueva = pd.DataFrame([[nuevo_id, solicitud, estado, fecha_mov, sprint, persona, "Sí" if carryover else "No"]], columns=solicitudes.columns)
+                nueva = pd.DataFrame([[nuevo_id, solicitud, estado, fecha_mov, sprint, persona,
+                                       "Sí" if carryover else "No", puntos_qa_str, puntos_dev_str]],
+                                     columns=solicitudes.columns)
                 solicitudes = pd.concat([solicitudes, nueva], ignore_index=True)
+
+                cambio = nueva.copy()
+                cambio["Fecha Cambio"] = hoy
+                cambio["Cambio"] = "Nuevo"
+                historial = pd.concat([historial, cambio], ignore_index=True)
+
                 guardar_csv(solicitudes, "sprint_data.csv")
+                guardar_csv(historial, "historial.csv")
                 st.success("✅ Solicitud agregada.")
 
 # ================================
@@ -110,24 +128,31 @@ st.dataframe(df_filtrado, use_container_width=True)
 # Historial de Actualizaciones
 # ================================
 
-st.subheader("🕒 Historial de Actualizaciones")
-filtro_hist_sprint = st.selectbox("🔍 Filtrar historial por Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
+st.subheader("🕒 Historial de Cambios")
+filtro_hist_sprint = st.selectbox("🔍 Filtrar historial por Sprint", ["Todos"] + list(sprints["Sprint"].unique()), key="hist")
 
 hist_filtrado = historial.copy()
 if filtro_hist_sprint != "Todos":
     hist_filtrado = hist_filtrado[hist_filtrado["Sprint"] == filtro_hist_sprint]
 
-st.dataframe(hist_filtrado[["ID Solicitud", "Fecha", "Campo", "Valor Anterior", "Valor Nuevo"]], use_container_width=True)
+st.dataframe(hist_filtrado[columnas_base + ["Fecha Cambio", "Cambio"]], use_container_width=True)
 
 # ================================
-# Métricas Resumen
+# Resumen por Sprint
 # ================================
 
-st.subheader("📊 Resumen General")
+st.subheader("📊 Resumen por Sprint")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Solicitudes Totales", len(solicitudes))
-col2.metric("Estados únicos", len(solicitudes["Estado"].unique()))
-col3.metric("Total de actualizaciones", len(historial))
+for sprint_nombre in sprints["Sprint"].unique():
+    df_sprint = solicitudes[solicitudes["Sprint"] == sprint_nombre]
+    total = len(df_sprint)
+    carryover_count = (df_sprint["Carryover"] == "Sí").sum()
+    puntos_qa = pd.to_numeric(df_sprint["Puntos QA"].replace("No aplica", 0)).sum()
+    puntos_dev = pd.to_numeric(df_sprint["Puntos Dev"].replace("No aplica", 0)).sum()
 
-# Gráfica eliminada (antes estaba aquí)
+    st.markdown(f"### Sprint: {sprint_nombre}")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Solicitudes", total)
+    col2.metric("Carryover", carryover_count)
+    col3.metric("Puntos QA", puntos_qa)
+    col4.metric("Puntos Dev", puntos_dev)
