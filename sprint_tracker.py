@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import os
 from datetime import date, datetime
-
-
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
@@ -13,7 +10,11 @@ st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
 def cargar_csv(nombre_archivo, columnas):
     try:
-        return pd.read_csv(nombre_archivo)
+        df = pd.read_csv(nombre_archivo)
+        for col in columnas:
+            if col not in df.columns:
+                df[col] = ""
+        return df
     except FileNotFoundError:
         return pd.DataFrame(columns=columnas)
 
@@ -26,13 +27,15 @@ fibonacci_options = ["No aplica", 1, 2, 3, 5, 8, 13, 21]
 # Cargar datos
 # ================================
 
-columnas_base = ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover", "Puntos QA", "Puntos Dev"]
+columnas_base = ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev"]
+columnas_historial = columnas_base + ["Fecha Cambio", "Cambio"]
+
 solicitudes = cargar_csv("sprint_data.csv", columnas_base)
 sprints = cargar_csv("sprints.csv", ["Sprint", "Fecha Desde", "Fecha Hasta", "Integrantes QA", "Integrantes Dev", "Días Efectivos"])
-historial = cargar_csv("historial.csv", columnas_base + ["Fecha Cambio", "Cambio"])
+historial = cargar_csv("historial.csv", columnas_historial)
 
 # ================================
-# Crear Sprint (expander)
+# Crear Sprint
 # ================================
 
 with st.expander("🛠 Crear Sprint"):
@@ -52,7 +55,7 @@ with st.expander("🛠 Crear Sprint"):
             st.success("✅ Sprint guardado.")
 
 # ================================
-# Nueva o Actualizar Solicitud
+# Nueva / Actualizar Solicitud
 # ================================
 
 st.title("📌 Seguimiento de Solicitudes")
@@ -64,7 +67,6 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
         estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
         fecha_mov = st.date_input("Fecha del Movimiento", value=date.today())
         sprint = st.selectbox("Asignar a Sprint", options=[""] + list(sprints["Sprint"].unique()))
-        persona = st.text_input("Persona Asignada")
         carryover = st.checkbox("¿Es Carryover?")
         puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
         puntos_dev = st.selectbox("Puntos Desarrollo", fibonacci_options)
@@ -81,7 +83,7 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
                 if not idx.empty:
                     i = idx[0]
                     old_row = solicitudes.loc[i].copy()
-                    solicitudes.loc[i] = [int(id_edit), solicitud, estado, fecha_mov, sprint, persona,
+                    solicitudes.loc[i] = [int(id_edit), solicitud, estado, fecha_mov, sprint, 
                                           "Sí" if carryover else "No", puntos_qa_str, puntos_dev_str]
 
                     cambio = pd.Series(solicitudes.loc[i])
@@ -96,7 +98,7 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
                     st.warning("⚠️ ID no encontrado.")
             else:
                 nuevo_id = 1 if solicitudes.empty else int(solicitudes["ID"].max()) + 1
-                nueva = pd.DataFrame([[nuevo_id, solicitud, estado, fecha_mov, sprint, persona,
+                nueva = pd.DataFrame([[nuevo_id, solicitud, estado, fecha_mov, sprint, 
                                        "Sí" if carryover else "No", puntos_qa_str, puntos_dev_str]],
                                      columns=solicitudes.columns)
                 solicitudes = pd.concat([solicitudes, nueva], ignore_index=True)
@@ -128,34 +130,45 @@ if filtro_estado != "Todos":
 st.dataframe(df_filtrado, use_container_width=True)
 
 # ================================
-# Historial de Actualizaciones
+# Historial de Cambios
 # ================================
 
 st.subheader("🕒 Historial de Cambios")
-filtro_hist_sprint = st.selectbox("🔍 Filtrar historial por Sprint", ["Todos"] + list(sprints["Sprint"].unique()), key="hist")
+
+filtro_hist_sprint = st.selectbox("📌 Filtrar por Sprint (historial)", ["Todos"] + list(sprints["Sprint"].unique()))
+filtro_fecha_inicio = st.date_input("📅 Desde", value=date.today().replace(month=1, day=1))
+filtro_fecha_fin = st.date_input("📅 Hasta", value=date.today())
 
 hist_filtrado = historial.copy()
 if filtro_hist_sprint != "Todos":
     hist_filtrado = hist_filtrado[hist_filtrado["Sprint"] == filtro_hist_sprint]
 
+hist_filtrado["Fecha Cambio"] = pd.to_datetime(hist_filtrado["Fecha Cambio"], errors='coerce')
+hist_filtrado = hist_filtrado[
+    (hist_filtrado["Fecha Cambio"] >= pd.to_datetime(filtro_fecha_inicio)) &
+    (hist_filtrado["Fecha Cambio"] <= pd.to_datetime(filtro_fecha_fin))
+]
+
 st.dataframe(hist_filtrado[columnas_base + ["Fecha Cambio", "Cambio"]], use_container_width=True)
 
 # ================================
-# Resumen por Sprint
+# Resumen General desde Historial
 # ================================
 
-st.subheader("📊 Resumen por Sprint")
+st.subheader("📊 Resumen por Sprint (basado en historial)")
 
-for sprint_nombre in sprints["Sprint"].unique():
-    df_sprint = solicitudes[solicitudes["Sprint"] == sprint_nombre]
-    total = len(df_sprint)
-    carryover_count = (df_sprint["Carryover"] == "Sí").sum()
-    puntos_qa = pd.to_numeric(df_sprint["Puntos QA"].replace("No aplica", 0)).sum()
-    puntos_dev = pd.to_numeric(df_sprint["Puntos Dev"].replace("No aplica", 0)).sum()
+hist_copy = hist_filtrado.copy()
+hist_copy["Puntos QA"] = pd.to_numeric(hist_copy["Puntos QA"].replace("No aplica", 0), errors='coerce').fillna(0)
+hist_copy["Puntos Dev"] = pd.to_numeric(hist_copy["Puntos Dev"].replace("No aplica", 0), errors='coerce').fillna(0)
 
-    st.markdown(f"### Sprint: {sprint_nombre}")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Solicitudes", total)
-    col2.metric("Carryover", carryover_count)
-    col3.metric("Puntos QA", puntos_qa)
-    col4.metric("Puntos Dev", puntos_dev)
+if not hist_copy.empty:
+    resumen = hist_copy.groupby("Sprint").agg(
+        Total_Solicitudes=("ID", "nunique"),
+        Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
+        Puntos_QA=("Puntos QA", "sum"),
+        Puntos_Dev=("Puntos Dev", "sum")
+    ).reset_index()
+
+    st.dataframe(resumen, use_container_width=True)
+else:
+    st.info("⚠️ No hay datos para mostrar en el resumen.")
