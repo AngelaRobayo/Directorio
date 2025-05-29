@@ -116,84 +116,54 @@ with st.expander("✏️ Modificar Solicitud Existente"):
         consultar_button = st.form_submit_button("Consultar Solicitud")
 
         if consultar_button:
-            if id_edit and id_edit.isdigit():
-                id_edit = int(id_edit)
-                if id_edit in solicitudes["ID"].values:
-                    # Si el ID es válido, se muestran los detalles de la solicitud
-                    solicitud_data = solicitudes[solicitudes["ID"] == id_edit].iloc[0]
+            if id_edit and id_edit.isdigit() and int(id_edit) in solicitudes["ID"].values:
+                # Si el ID es válido, se muestran los detalles de la solicitud
+                solicitud_data = solicitudes[solicitudes["ID"] == int(id_edit)].iloc[0]
+                
+                # Mostrar los detalles actuales de la solicitud (solo descripción no editable)
+                st.write("**Descripción:**", solicitud_data["Solicitud"])
+                st.write("**Tipo de Solicitud:**", solicitud_data["Tipo Solicitud"])
+
+                # Campos para modificar, todos menos la descripción
+                estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"], index=["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"].index(solicitud_data["Estado"]))
+                fecha_mov = st.date_input("Fecha de Movimiento", value=pd.to_datetime(solicitud_data["Fecha Movimiento"]))
+                sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()), index=0 if solicitud_data["Sprint"] == "" else list(sprints["Sprint"].unique()).index(solicitud_data["Sprint"]))
+                carryover = st.checkbox("¿Es Carryover?", value=(solicitud_data["Carryover"] == "Sí"))
+                puntos_qa = st.selectbox("Puntos QA", fibonacci_options, index=fibonacci_options.index(int(solicitud_data["Puntos QA"])) if str(solicitud_data["Puntos QA"]).isdigit() else 0)
+                puntos_dev = st.selectbox("Puntos Dev", fibonacci_options, index=fibonacci_options.index(int(solicitud_data["Puntos Dev"])) if str(solicitud_data["Puntos Dev"]).isdigit() else 0)
+                compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"], index=["Desarrollo", "QA", "Ambos"].index(solicitud_data["Compromiso"]))
+
+                id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
+                tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) else 0.0)
+
+                # Aquí el botón de submit para guardar los cambios
+                submit_button = st.form_submit_button("Guardar Cambios")
+
+                # Procesar la actualización solo cuando se presiona el botón
+                if submit_button:
+                    hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # Mostrar los detalles actuales de la solicitud (solo descripción no editable)
-                    st.write("**Descripción:**", solicitud_data["Solicitud"])
-                    st.write("**Tipo de Solicitud:**", solicitud_data["Tipo Solicitud"])
+                    # Actualizar la solicitud
+                    idx = solicitudes[solicitudes["ID"] == int(id_edit)].index[0]
+                    solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
+                        estado, fecha_mov, sprint, "Sí" if carryover else "No",
+                        str(puntos_qa), str(puntos_dev), compromiso, id_hu, tiempo_res
+                    ]
 
-                    # Campos para modificar, todos menos la descripción
-                    estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"], index=["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"].index(solicitud_data["Estado"]))
-                    fecha_mov = st.date_input("Fecha de Movimiento", value=pd.to_datetime(solicitud_data["Fecha Movimiento"]))
-                    sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()), index=0 if solicitud_data["Sprint"] == "" else list(sprints["Sprint"].unique()).index(solicitud_data["Sprint"]))
-                    carryover = st.checkbox("¿Es Carryover?", value=(solicitud_data["Carryover"] == "Sí"))
-                    puntos_qa = st.selectbox("Puntos QA", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos QA"]) if solicitud_data["Puntos QA"] in fibonacci_options else 0)
-                    puntos_dev = st.selectbox("Puntos Dev", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos Dev"]) if solicitud_data["Puntos Dev"] in fibonacci_options else 0)
-                    compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"], index=["Desarrollo", "QA", "Ambos"].index(solicitud_data["Compromiso"]))
+                    # Registrar el cambio en el historial
+                    historial_reg = solicitudes.loc[[idx]].copy()
+                    historial_reg["Fecha Cambio"] = hoy
+                    historial_reg["Cambio"] = "Actualización"
+                    historial = pd.concat([historial, historial_reg], ignore_index=True)
 
-                    id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
-                    tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) and solicitud_data["Tiempo Resolución (h)"] != "" else 0.0)
+                    # Guardar los datos en los archivos CSV
+                    guardar_csv(solicitudes, "sprint_data.csv")
+                    guardar_csv(historial, "historial.csv")
 
-                    # Aquí el botón de submit para guardar los cambios
-                    submit_button = st.form_submit_button("Guardar Cambios")
-
-                    # Procesar la actualización solo cuando se presiona el botón
-                    if submit_button:
-                        hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        
-                        # Asegurarse de que idx sea correcto
-                        idx = solicitudes[solicitudes["ID"] == id_edit].index
-                        if len(idx) == 0:
-                            st.error(f"No se encontró la solicitud con ID: {id_edit}")
-                        else:
-                            idx = idx[0]  # Asegurarse de tomar el primer índice
-
-                            # Mostrar depuración de los cambios que se van a guardar
-                            st.write("Actualizando solicitud con ID:", id_edit)
-                            st.write("Nuevo Estado:", estado)
-                            st.write("Nueva Fecha de Movimiento:", fecha_mov)
-                            st.write("Nuevo Sprint:", sprint)
-                            st.write("Nuevo Carryover:", "Sí" if carryover else "No")
-                            st.write("Nuevo Puntos QA:", puntos_qa)
-                            st.write("Nuevo Puntos Dev:", puntos_dev)
-                            st.write("Nuevo Compromiso:", compromiso)
-                            st.write("Nuevo ID HU Relacionada:", id_hu)
-                            st.write("Nuevo Tiempo de Resolución:", tiempo_res)
-
-                            # Actualizar la solicitud
-                            solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
-                                estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev), compromiso, id_hu, tiempo_res
-                            ]
-
-                            # Verificación del DataFrame actualizado
-                            st.write("DataFrame actualizado:")
-                            st.write(solicitudes.head())
-
-                            # Agregar al historial
-                            historial_reg = solicitudes.loc[[idx]].copy()
-                            historial_reg["Fecha Cambio"] = hoy
-                            historial_reg["Cambio"] = "Modificado"
-                            historial = pd.concat([historial, historial_reg], ignore_index=True)
-
-                            # Verificación antes de guardar
-                            st.write("Se está guardando el DataFrame de solicitudes...")
-                            st.write(solicitudes.head())
-
-                            # Guardar los datos en los archivos CSV
-                            try:
-                                guardar_csv(solicitudes, "sprint_data.csv")
-                                guardar_csv(historial, "historial.csv")
-                                st.success("✅ Solicitud modificada exitosamente.")
-                            except Exception as e:
-                                st.error(f"Error al guardar los archivos CSV: {str(e)}")
-                else:
-                    st.warning("⚠️ El ID ingresado no existe.")
+                    # Mensaje de éxito
+                    st.success("✅ Solicitud modificada exitosamente.")
             else:
-                st.warning("⚠️ Ingresa un ID válido.")
+                st.warning("⚠️ El ID no existe o no es válido.")
 
 
 # Mostrar solicitudes
