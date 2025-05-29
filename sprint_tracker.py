@@ -139,6 +139,8 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                 # Aquí el botón de submit para guardar los cambios
                 submit_button = st.form_submit_button("Guardar Cambios")
 
+                print("Prueba guardar")
+                
                 # Procesar la actualización solo cuando se presiona el botón
                 if submit_button:
                     hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
