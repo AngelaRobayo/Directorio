@@ -45,7 +45,8 @@ with st.expander("🛠 Crear Sprint"):
         qa = st.number_input("Integrantes QA", min_value=0)
         dev = st.number_input("Integrantes Desarrollo", min_value=0)
         dias_efectivos = st.number_input("Días efectivos del sprint", min_value=1)
-        if st.form_submit_button("Guardar Sprint"):
+        submit_sprint = st.form_submit_button("Guardar Sprint")  # Asegúrate de que esté dentro del form
+        if submit_sprint:
             sprints = pd.concat([sprints, pd.DataFrame([[sprint_name, fecha_desde, fecha_hasta, qa, dev, dias_efectivos]], columns=sprints.columns)], ignore_index=True)
             guardar_csv(sprints, "sprints.csv")
             st.success("Sprint guardado.")
@@ -73,7 +74,8 @@ with st.expander("🆕 Crear Nueva Solicitud"):
             id_hu = st.text_input("ID HU Relacionada (opcional)")
             tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5)
 
-        if st.form_submit_button("Guardar Nueva Solicitud"):
+        submit_crear_solicitud = st.form_submit_button("Guardar Nueva Solicitud")  # Asegúrate de que esté dentro del form
+        if submit_crear_solicitud:
             hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             if not id_nuevo.isdigit():
                 st.error("ID debe ser un número entero válido.")
@@ -116,8 +118,8 @@ with st.expander("✏️ Modificar Solicitud Existente"):
             id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
             tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) and solicitud_data["Tiempo Resolución (h)"] != "" else 0.0)
 
-            # Aquí es donde se agrega el botón de submit dentro del formulario
-            if st.form_submit_button("Guardar Cambios"):  # Ahora está dentro del formulario
+            submit_modificar_solicitud = st.form_submit_button("Guardar Cambios")  # Asegúrate de que esté dentro del form
+            if submit_modificar_solicitud:
                 hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 idx = solicitudes[solicitudes["ID"] == int(id_edit)].index[0]
                 solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Puntos Finales", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
@@ -159,7 +161,7 @@ st.subheader("📊 Resumen General por Sprint")
 resumen = df_filtrado.copy()
 resumen["Puntos QA"] = pd.to_numeric(resumen["Puntos QA"].replace("No aplica", 0), errors="coerce").fillna(0)
 resumen["Puntos Dev"] = pd.to_numeric(resumen["Puntos Dev"].replace("No aplica", 0), errors="coerce").fillna(0)
-resumen["Puntos Finales"] = pd.to_numeric(resumen["Puntos Finales"].replace("No aplica", 0), errors="coerce").fillna(0)  # Agregado
+resumen["Puntos Finales"] = pd.to_numeric(resumen["Puntos Finales"].replace("No aplica", 0), errors="coerce").fillna(0)
 resumen["Tiempo Resolución (h)"] = pd.to_numeric(resumen["Tiempo Resolución (h)"], errors="coerce").fillna(0)
 
 if not resumen.empty:
@@ -168,7 +170,7 @@ if not resumen.empty:
         Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
         Puntos_QA=("Puntos QA", "sum"),
         Puntos_Dev=("Puntos Dev", "sum"),
-        Puntos_Finales=("Puntos Finales", "sum"),  # Agregado
+        Puntos_Finales=("Puntos Finales", "sum"),
         QA_only=("Compromiso", lambda x: (x == "QA").sum()),
         Dev_only=("Compromiso", lambda x: (x == "Desarrollo").sum()),
         Ambos=("Compromiso", lambda x: (x == "Ambos").sum()),
