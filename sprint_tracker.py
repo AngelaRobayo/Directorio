@@ -169,6 +169,10 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                                 estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev), compromiso, id_hu, tiempo_res
                             ]
 
+                            # Verificación del DataFrame actualizado
+                            st.write("DataFrame actualizado:")
+                            st.write(solicitudes.head())
+
                             # Agregar al historial
                             historial_reg = solicitudes.loc[[idx]].copy()
                             historial_reg["Fecha Cambio"] = hoy
@@ -180,11 +184,12 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                             st.write(solicitudes.head())
 
                             # Guardar los datos en los archivos CSV
-                            guardar_csv(solicitudes, "sprint_data.csv")
-                            guardar_csv(historial, "historial.csv")
-
-                            # Mensaje de éxito
-                            st.success("✅ Solicitud modificada exitosamente.")
+                            try:
+                                guardar_csv(solicitudes, "sprint_data.csv")
+                                guardar_csv(historial, "historial.csv")
+                                st.success("✅ Solicitud modificada exitosamente.")
+                            except Exception as e:
+                                st.error(f"Error al guardar los archivos CSV: {str(e)}")
                 else:
                     st.warning("⚠️ El ID ingresado no existe.")
             else:
