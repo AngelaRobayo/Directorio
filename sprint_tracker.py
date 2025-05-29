@@ -107,7 +107,6 @@ with st.expander("🆕 Crear Nueva Solicitud"):
                 st.success("✅ Solicitud creada.")
 
 # Modificar Solicitud Existente
-# Modificar Solicitud Existente
 with st.expander("✏️ Modificar Solicitud Existente"):
     with st.form("form_modificar_solicitud"):
         # Ingreso del ID para consulta
@@ -176,9 +175,9 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                             historial_reg["Cambio"] = "Modificado"
                             historial = pd.concat([historial, historial_reg], ignore_index=True)
 
-                            # Actualizar las sesiones de estado
-                            st.session_state.solicitudes = solicitudes
-                            st.session_state.historial = historial
+                            # Verificación antes de guardar
+                            st.write("Se está guardando el DataFrame de solicitudes...")
+                            st.write(solicitudes.head())
 
                             # Guardar los datos en los archivos CSV
                             guardar_csv(solicitudes, "sprint_data.csv")
@@ -190,6 +189,7 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                     st.warning("⚠️ El ID ingresado no existe.")
             else:
                 st.warning("⚠️ Ingresa un ID válido.")
+
 
 # Mostrar solicitudes
 st.subheader("📋 Solicitudes Registradas")
