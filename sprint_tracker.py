@@ -14,7 +14,7 @@ columnas_solicitudes = [
 
 columnas_historial = columnas_solicitudes + ["Fecha Cambio", "Cambio"]
 
-fibonacci_options = ["No aplica", 1, 2, 3, 5, 8, 13, 21]
+fibonacci_options = ["0", 1, 2, 3, 5, 8, 13, 21]
 
 def asegurar_columnas(df, columnas):
     for col in columnas:
