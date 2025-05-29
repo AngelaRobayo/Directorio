@@ -2,6 +2,24 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime
 
+def asegurar_columnas(df, columnas_requeridas):
+    for col in columnas_requeridas:
+        if col not in df.columns:
+            df[col] = ""
+    return df[columnas_requeridas]
+
+def cargar_csv(nombre_archivo, columnas_requeridas):
+    if not os.path.exists(nombre_archivo):
+        return pd.DataFrame(columns=columnas_requeridas)
+    try:
+        df = pd.read_csv(nombre_archivo)
+        df = asegurar_columnas(df, columnas_requeridas)
+        return df
+    except Exception as e:
+        st.error(f"❌ Error cargando {nombre_archivo}: {e}")
+        return pd.DataFrame(columns=columnas_requeridas)
+
+
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
 # ================================
