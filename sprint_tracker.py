@@ -54,47 +54,6 @@ with st.expander("🛠 Crear Sprint"):
 # Solicitudes
 st.title("📌 Seguimiento de Solicitudes")
 
-with st.expander("🆕 Crear Nueva Solicitud"):
-    with st.form("form_crear_solicitud"):
-        id_nuevo = st.text_input("ID (único)")
-        solicitud = st.text_input("Descripción")
-        tipo = st.selectbox("Tipo de Solicitud", ["Historia de usuario", "Deuda Técnica", "Defecto"])
-        estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
-        fecha_mov = st.date_input("Fecha de Movimiento", value=date.today())
-        sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()))
-        carryover = st.checkbox("¿Es Carryover?")
-        puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
-        puntos_dev = st.selectbox("Puntos Dev", fibonacci_options)
-        puntos_finales = st.selectbox("Puntos Finales", fibonacci_options)
-        compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"])
-
-        id_hu = ""
-        tiempo_res = ""
-        if tipo == "Defecto":
-            id_hu = st.text_input("ID HU Relacionada (opcional)")
-            tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5)
-
-        submit_crear_solicitud = st.form_submit_button("Guardar Nueva Solicitud")
-        if submit_crear_solicitud:
-            hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if not id_nuevo.isdigit():
-                st.error("ID debe ser un número entero válido.")
-            elif int(id_nuevo) in solicitudes["ID"].values:
-                st.error("Este ID ya existe. Usa el formulario de modificación.")
-            else:
-                fila = [
-                    int(id_nuevo), solicitud, tipo, estado, fecha_mov, sprint,
-                    "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev),
-                    str(puntos_finales), compromiso, id_hu, tiempo_res
-                ]
-                nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
-                solicitudes = pd.concat([solicitudes, nueva_df], ignore_index=True)
-                nueva_df["Fecha Cambio"] = hoy
-                nueva_df["Cambio"] = "Nuevo"
-                historial = pd.concat([historial, nueva_df], ignore_index=True)
-                guardar_csv(solicitudes, "sprint_data.csv")
-                guardar_csv(historial, "historial.csv")
-                st.success("✅ Solicitud creada.")
 
 with st.expander("✏️ Modificar Solicitud Existente"):
     with st.form("form_modificar_solicitud"):
@@ -138,6 +97,50 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                 st.success("✅ Solicitud modificada exitosamente.")
         elif id_edit:
             st.warning("⚠️ El ID no existe o no es válido.")
+
+with st.expander("🆕 Crear Nueva Solicitud"):
+    with st.form("form_crear_solicitud"):
+        id_nuevo = st.text_input("ID (único)")
+        solicitud = st.text_input("Descripción")
+        tipo = st.selectbox("Tipo de Solicitud", ["Historia de usuario", "Deuda Técnica", "Defecto"])
+        estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
+        fecha_mov = st.date_input("Fecha de Movimiento", value=date.today())
+        sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()))
+        carryover = st.checkbox("¿Es Carryover?")
+        puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
+        puntos_dev = st.selectbox("Puntos Dev", fibonacci_options)
+        puntos_finales = st.selectbox("Puntos Finales", fibonacci_options)
+        compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"])
+
+        id_hu = ""
+        tiempo_res = ""
+        if tipo == "Defecto":
+            id_hu = st.text_input("ID HU Relacionada (opcional)")
+            tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5)
+
+        submit_crear_solicitud = st.form_submit_button("Guardar Nueva Solicitud")
+        if submit_crear_solicitud:
+            hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if not id_nuevo.isdigit():
+                st.error("ID debe ser un número entero válido.")
+            elif int(id_nuevo) in solicitudes["ID"].values:
+                st.error("Este ID ya existe. Usa el formulario de modificación.")
+            else:
+                fila = [
+                    int(id_nuevo), solicitud, tipo, estado, fecha_mov, sprint,
+                    "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev),
+                    str(puntos_finales), compromiso, id_hu, tiempo_res
+                ]
+                nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
+                solicitudes = pd.concat([solicitudes, nueva_df], ignore_index=True)
+                nueva_df["Fecha Cambio"] = hoy
+                nueva_df["Cambio"] = "Nuevo"
+                historial = pd.concat([historial, nueva_df], ignore_index=True)
+                guardar_csv(solicitudes, "sprint_data.csv")
+                guardar_csv(historial, "historial.csv")
+                st.success("✅ Solicitud creada.")
+
+
 
 # Mostrar solicitudes
 st.subheader("📋 Solicitudes Registradas")
