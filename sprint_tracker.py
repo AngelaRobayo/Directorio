@@ -5,9 +5,9 @@ import os
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
-# Columnas base
+# Columnas base (sin IDDevOps, solo ID)
 columnas_solicitudes = [
-    "ID", "IDDevOps", "Solicitud", "Tipo Solicitud", "Estado", "Fecha Movimiento",
+    "ID", "Solicitud", "Tipo Solicitud", "Estado", "Fecha Movimiento",
     "Sprint", "Carryover", "Puntos QA", "Puntos Dev"
 ]
 
@@ -56,8 +56,7 @@ st.title("📌 Seguimiento de Solicitudes")
 
 with st.expander("➕ Nueva / Actualizar Solicitud"):
     with st.form("form_solicitud"):
-        id_edit = st.text_input("ID (dejar vacío para nueva)", "")
-        id_devops = st.number_input("ID DevOps", min_value=0, step=1)
+        id_edit = st.text_input("ID (numérico, único)")
         solicitud = st.text_input("Descripción")
         tipo = st.selectbox("Tipo de Solicitud", ["Historia de usuario", "Deuda Técnica", "Defecto"])
         estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
@@ -69,39 +68,46 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
 
         if st.form_submit_button("Guardar Solicitud"):
             hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            nuevo_id = int(id_edit) if id_edit else (1 if solicitudes.empty else int(solicitudes["ID"].max()) + 1)
-            fila = [nuevo_id, int(id_devops), solicitud, tipo, estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev)]
-            nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
+            if not id_edit.isdigit():
+                st.error("ID debe ser un número entero válido.")
+            else:
+                nuevo_id = int(id_edit)
+                fila = [nuevo_id, solicitud, tipo, estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev)]
+                nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
 
-            if id_edit:
-                idx = solicitudes[solicitudes["ID"] == int(id_edit)].index
-                if not idx.empty:
-                    solicitudes.loc[idx[0]] = fila
+                if nuevo_id in solicitudes["ID"].values:
+                    # Actualizar registro existente
+                    idx = solicitudes[solicitudes["ID"] == nuevo_id].index[0]
+                    solicitudes.loc[idx] = fila
                     nueva_df["Fecha Cambio"] = hoy
                     nueva_df["Cambio"] = "Actualización"
                     historial = pd.concat([historial, nueva_df], ignore_index=True)
                     st.success("📝 Solicitud actualizada.")
-            else:
-                solicitudes = pd.concat([solicitudes, nueva_df], ignore_index=True)
-                nueva_df["Fecha Cambio"] = hoy
-                nueva_df["Cambio"] = "Nuevo"
-                historial = pd.concat([historial, nueva_df], ignore_index=True)
-                st.success("✅ Solicitud agregada.")
+                else:
+                    # Nuevo registro
+                    solicitudes = pd.concat([solicitudes, nueva_df], ignore_index=True)
+                    nueva_df["Fecha Cambio"] = hoy
+                    nueva_df["Cambio"] = "Nuevo"
+                    historial = pd.concat([historial, nueva_df], ignore_index=True)
+                    st.success("✅ Solicitud agregada.")
 
-            guardar_csv(solicitudes, "sprint_data.csv")
-            guardar_csv(historial, "historial.csv")
+                guardar_csv(solicitudes, "sprint_data.csv")
+                guardar_csv(historial, "historial.csv")
 
 # Mostrar solicitudes
 st.subheader("📋 Solicitudes Registradas")
 
 filtro_sprint = st.selectbox("🔎 Filtrar por Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
 filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].unique()))
+filtro_id = st.text_input("🔍 Buscar por ID")
 
 df_filtrado = solicitudes.copy()
 if filtro_sprint != "Todos":
     df_filtrado = df_filtrado[df_filtrado["Sprint"] == filtro_sprint]
 if filtro_estado != "Todos":
     df_filtrado = df_filtrado[df_filtrado["Estado"] == filtro_estado]
+if filtro_id:
+    df_filtrado = df_filtrado[df_filtrado["ID"].astype(str).str.contains(filtro_id.strip())]
 
 st.dataframe(df_filtrado, use_container_width=True)
 
@@ -111,30 +117,26 @@ st.subheader("🕒 Historial de Cambios")
 historial["Fecha Cambio"] = pd.to_datetime(historial["Fecha Cambio"], errors='coerce')
 historial["Fecha Movimiento"] = pd.to_datetime(historial["Fecha Movimiento"], errors='coerce')
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 with col1:
-    filtro_hist_sprint = st.selectbox("📌 Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
+    filtro_hist_sprint = st.selectbox("📌 Sprint (Historial)", ["Todos"] + list(sprints["Sprint"].unique()))
 with col2:
-    aplicar_fechas = st.checkbox("📅 Filtrar por fechas")
+    aplicar_fechas = st.checkbox("📅 Filtrar por fechas (Historial)")
 with col3:
-    filtro_id = st.text_input("🔍 Buscar por ID")
-with col4:
-    filtro_id_devops = st.text_input("🔍 Buscar por ID DevOps")
+    filtro_hist_id = st.text_input("🔍 Buscar por ID (Historial)")
 
 hist_filtrado = historial.copy()
 if filtro_hist_sprint != "Todos":
     hist_filtrado = hist_filtrado[hist_filtrado["Sprint"] == filtro_hist_sprint]
 if aplicar_fechas:
-    fecha_ini = st.date_input("Desde", date.today().replace(month=1, day=1))
-    fecha_fin = st.date_input("Hasta", date.today())
+    fecha_ini = st.date_input("Desde (Historial)", date.today().replace(month=1, day=1))
+    fecha_fin = st.date_input("Hasta (Historial)", date.today())
     hist_filtrado = hist_filtrado[
         (hist_filtrado["Fecha Cambio"] >= pd.to_datetime(fecha_ini)) &
         (hist_filtrado["Fecha Cambio"] <= pd.to_datetime(fecha_fin))
     ]
-if filtro_id:
-    hist_filtrado = hist_filtrado[hist_filtrado["ID"].astype(str).str.contains(filtro_id.strip())]
-if filtro_id_devops:
-    hist_filtrado = hist_filtrado[hist_filtrado["IDDevOps"].astype(str).str.contains(filtro_id_devops.strip())]
+if filtro_hist_id:
+    hist_filtrado = hist_filtrado[hist_filtrado["ID"].astype(str).str.contains(filtro_hist_id.strip())]
 
 st.dataframe(hist_filtrado[columnas_historial], use_container_width=True)
 
