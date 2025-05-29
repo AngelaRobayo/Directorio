@@ -5,18 +5,17 @@ import os
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
-# Columnas base (sin IDDevOps, solo ID)
+# Columnas base actualizadas
 columnas_solicitudes = [
     "ID", "Solicitud", "Tipo Solicitud", "Estado", "Fecha Movimiento",
-    "Sprint", "Carryover", "Puntos QA", "Puntos Dev"
+    "Sprint", "Carryover", "Puntos QA", "Puntos Dev",
+    "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"
 ]
 
 columnas_historial = columnas_solicitudes + ["Fecha Cambio", "Cambio"]
 
-# Opciones de esfuerzo
 fibonacci_options = ["No aplica", 1, 2, 3, 5, 8, 13, 21]
 
-# Funciones
 def asegurar_columnas(df, columnas):
     for col in columnas:
         if col not in df.columns:
@@ -65,6 +64,13 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
         carryover = st.checkbox("¿Es Carryover?")
         puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
         puntos_dev = st.selectbox("Puntos Dev", fibonacci_options)
+        compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"])
+
+        id_hu = ""
+        tiempo_res = ""
+        if tipo == "Defecto":
+            id_hu = st.text_input("ID HU Relacionada (opcional)")
+            tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5)
 
         if st.form_submit_button("Guardar Solicitud"):
             hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -72,11 +78,14 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
                 st.error("ID debe ser un número entero válido.")
             else:
                 nuevo_id = int(id_edit)
-                fila = [nuevo_id, solicitud, tipo, estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev)]
+                fila = [
+                    nuevo_id, solicitud, tipo, estado, fecha_mov, sprint,
+                    "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev),
+                    compromiso, id_hu, tiempo_res
+                ]
                 nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
 
                 if nuevo_id in solicitudes["ID"].values:
-                    # Actualizar registro existente
                     idx = solicitudes[solicitudes["ID"] == nuevo_id].index[0]
                     solicitudes.loc[idx] = fila
                     nueva_df["Fecha Cambio"] = hoy
@@ -84,7 +93,6 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
                     historial = pd.concat([historial, nueva_df], ignore_index=True)
                     st.success("📝 Solicitud actualizada.")
                 else:
-                    # Nuevo registro
                     solicitudes = pd.concat([solicitudes, nueva_df], ignore_index=True)
                     nueva_df["Fecha Cambio"] = hoy
                     nueva_df["Cambio"] = "Nuevo"
@@ -111,7 +119,7 @@ if filtro_id:
 
 st.dataframe(df_filtrado, use_container_width=True)
 
-# Historial de Cambios
+# Historial
 st.subheader("🕒 Historial de Cambios")
 
 historial["Fecha Cambio"] = pd.to_datetime(historial["Fecha Cambio"], errors='coerce')
@@ -140,26 +148,35 @@ if filtro_hist_id:
 
 st.dataframe(hist_filtrado[columnas_historial], use_container_width=True)
 
-# Resumen por Sprint
+# Resumen
 st.subheader("📊 Resumen General por Sprint")
 
 resumen = hist_filtrado.copy()
 resumen["Puntos QA"] = pd.to_numeric(resumen["Puntos QA"].replace("No aplica", 0), errors="coerce").fillna(0)
 resumen["Puntos Dev"] = pd.to_numeric(resumen["Puntos Dev"].replace("No aplica", 0), errors="coerce").fillna(0)
+resumen["Tiempo Resolución (h)"] = pd.to_numeric(resumen["Tiempo Resolución (h)"], errors="coerce").fillna(0)
 
 if not resumen.empty:
     resumen_agg = resumen.groupby("Sprint").agg(
         Total_Solicitudes=("ID", "nunique"),
         Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
         Puntos_QA=("Puntos QA", "sum"),
-        Puntos_Dev=("Puntos Dev", "sum")
+        Puntos_Dev=("Puntos Dev", "sum"),
+        QA_only=("Compromiso", lambda x: (x == "QA").sum()),
+        Dev_only=("Compromiso", lambda x: (x == "Desarrollo").sum()),
+        Ambos=("Compromiso", lambda x: (x == "Ambos").sum()),
+        Tiempo_Resolucion_Prom=("Tiempo Resolución (h)", "mean")
     ).reset_index()
 
-    resumen_completo = pd.merge(resumen_agg, sprints, how="left", left_on="Sprint", right_on="Sprint")
+    resumen_completo = pd.merge(resumen_agg, sprints, how="left", on="Sprint")
     resumen_completo = resumen_completo[[
         "Sprint", "Total_Solicitudes", "Total_Carryover",
-        "Integrantes QA", "Integrantes Dev", "Fecha Desde", "Fecha Hasta"
+        "Integrantes QA", "Integrantes Dev",
+        "QA_only", "Dev_only", "Ambos",
+        "Tiempo_Resolucion_Prom",
+        "Fecha Desde", "Fecha Hasta"
     ]]
+
     st.dataframe(resumen_completo, use_container_width=True)
 else:
     st.info("⚠️ No hay datos para mostrar.")
