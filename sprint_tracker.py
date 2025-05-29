@@ -8,7 +8,7 @@ st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 # Columnas base actualizadas
 columnas_solicitudes = [
     "ID", "Solicitud", "Tipo Solicitud", "Estado", "Fecha Movimiento",
-    "Sprint", "Carryover", "Puntos QA", "Puntos Dev",
+    "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Puntos Finales",  # Añadir Puntos Finales
     "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"
 ]
 
@@ -64,6 +64,7 @@ with st.expander("🆕 Crear Nueva Solicitud"):
         carryover = st.checkbox("¿Es Carryover?")
         puntos_qa = st.selectbox("Puntos QA", fibonacci_options)
         puntos_dev = st.selectbox("Puntos Dev", fibonacci_options)
+        puntos_finales = st.selectbox("Puntos Finales", fibonacci_options)  # Agregado
         compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"])
 
         id_hu = ""
@@ -82,6 +83,7 @@ with st.expander("🆕 Crear Nueva Solicitud"):
                 fila = [
                     int(id_nuevo), solicitud, tipo, estado, fecha_mov, sprint,
                     "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev),
+                    str(puntos_finales),  # Agregar Puntos Finales
                     compromiso, id_hu, tiempo_res
                 ]
                 nueva_df = pd.DataFrame([fila], columns=columnas_solicitudes)
@@ -108,6 +110,7 @@ with st.expander("✏️ Modificar Solicitud Existente"):
             carryover = st.checkbox("¿Es Carryover?", value=(solicitud_data["Carryover"] == "Sí"))
             puntos_qa = st.selectbox("Puntos QA", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos QA"]) if solicitud_data["Puntos QA"] in fibonacci_options else 0)
             puntos_dev = st.selectbox("Puntos Dev", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos Dev"]) if solicitud_data["Puntos Dev"] in fibonacci_options else 0)
+            puntos_finales = st.selectbox("Puntos Finales", fibonacci_options, index=fibonacci_options.index(solicitud_data["Puntos Finales"]) if solicitud_data["Puntos Finales"] in fibonacci_options else 0)  # Agregado
             compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"], index=["Desarrollo", "QA", "Ambos"].index(solicitud_data["Compromiso"]))
 
             id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
@@ -116,9 +119,9 @@ with st.expander("✏️ Modificar Solicitud Existente"):
             if st.form_submit_button("Guardar Cambios"):
                 hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 idx = solicitudes[solicitudes["ID"] == int(id_edit)].index[0]
-                solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
+                solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Puntos Finales", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
                     estado, fecha_mov, sprint, "Sí" if carryover else "No",
-                    str(puntos_qa), str(puntos_dev), compromiso, id_hu, tiempo_res
+                    str(puntos_qa), str(puntos_dev), str(puntos_finales), compromiso, id_hu, tiempo_res
                 ]
 
                 historial_reg = solicitudes.loc[[idx]].copy()
@@ -136,77 +139,4 @@ with st.expander("✏️ Modificar Solicitud Existente"):
 st.subheader("📋 Solicitudes Registradas")
 
 filtro_sprint = st.selectbox("🔎 Filtrar por Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
-filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].unique()))
-filtro_id = st.text_input("🔍 Buscar por ID")
-
-df_filtrado = solicitudes.copy()
-if filtro_sprint != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Sprint"] == filtro_sprint]
-if filtro_estado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Estado"] == filtro_estado]
-if filtro_id:
-    df_filtrado = df_filtrado[df_filtrado["ID"].astype(str).str.contains(filtro_id.strip())]
-
-st.dataframe(df_filtrado, use_container_width=True)
-
-# Historial
-st.subheader("🕒 Historial de Cambios")
-
-historial["Fecha Cambio"] = pd.to_datetime(historial["Fecha Cambio"], errors='coerce')
-historial["Fecha Movimiento"] = pd.to_datetime(historial["Fecha Movimiento"], errors='coerce')
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    filtro_hist_sprint = st.selectbox("📌 Sprint (Historial)", ["Todos"] + list(sprints["Sprint"].unique()))
-with col2:
-    aplicar_fechas = st.checkbox("📅 Filtrar por fechas (Historial)")
-with col3:
-    filtro_hist_id = st.text_input("🔍 Buscar por ID (Historial)")
-
-hist_filtrado = historial.copy()
-if filtro_hist_sprint != "Todos":
-    hist_filtrado = hist_filtrado[hist_filtrado["Sprint"] == filtro_hist_sprint]
-if aplicar_fechas:
-    fecha_ini = st.date_input("Desde (Historial)", date.today().replace(month=1, day=1))
-    fecha_fin = st.date_input("Hasta (Historial)", date.today())
-    hist_filtrado = hist_filtrado[
-        (hist_filtrado["Fecha Cambio"] >= pd.to_datetime(fecha_ini)) &
-        (hist_filtrado["Fecha Cambio"] <= pd.to_datetime(fecha_fin))
-    ]
-if filtro_hist_id:
-    hist_filtrado = hist_filtrado[hist_filtrado["ID"].astype(str).str.contains(filtro_hist_id.strip())]
-
-st.dataframe(hist_filtrado[columnas_historial], use_container_width=True)
-
-# Resumen
-st.subheader("📊 Resumen General por Sprint")
-
-resumen = hist_filtrado.copy()
-resumen["Puntos QA"] = pd.to_numeric(resumen["Puntos QA"].replace("No aplica", 0), errors="coerce").fillna(0)
-resumen["Puntos Dev"] = pd.to_numeric(resumen["Puntos Dev"].replace("No aplica", 0), errors="coerce").fillna(0)
-resumen["Tiempo Resolución (h)"] = pd.to_numeric(resumen["Tiempo Resolución (h)"], errors="coerce").fillna(0)
-
-if not resumen.empty:
-    resumen_agg = resumen.groupby("Sprint").agg(
-        Total_Solicitudes=("ID", "nunique"),
-        Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
-        Puntos_QA=("Puntos QA", "sum"),
-        Puntos_Dev=("Puntos Dev", "sum"),
-        QA_only=("Compromiso", lambda x: (x == "QA").sum()),
-        Dev_only=("Compromiso", lambda x: (x == "Desarrollo").sum()),
-        Ambos=("Compromiso", lambda x: (x == "Ambos").sum()),
-        Tiempo_Resolucion_Prom=("Tiempo Resolución (h)", "mean")
-    ).reset_index()
-
-    resumen_completo = pd.merge(resumen_agg, sprints, how="left", on="Sprint")
-    resumen_completo = resumen_completo[[
-        "Sprint", "Total_Solicitudes", "Total_Carryover",
-        "Integrantes QA", "Integrantes Dev",
-        "QA_only", "Dev_only", "Ambos",
-        "Tiempo_Resolucion_Prom",
-        "Fecha Desde", "Fecha Hasta"
-    ]]
-
-    st.dataframe(resumen_completo, use_container_width=True)
-else:
-    st.info("⚠️ No hay datos para mostrar.")
+filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].
