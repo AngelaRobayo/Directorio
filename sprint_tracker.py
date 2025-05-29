@@ -59,7 +59,7 @@ with st.expander("➕ Nueva / Actualizar Solicitud"):
         id_edit = st.text_input("ID (dejar vacío para nueva)", "")
         id_devops = st.number_input("ID DevOps", min_value=0, step=1)
         solicitud = st.text_input("Descripción")
-        tipo = st.selectbox("Tipo de Solicitud", ["Historia de usuario", "Deuda", "Defecto"])
+        tipo = st.selectbox("Tipo de Solicitud", ["Historia de usuario", "Deuda Técnica", "Defecto"])
         estado = st.selectbox("Estado", ["Por priorizar", "Backlog Desarrollo", "En desarrollo", "Pruebas QA", "Pruebas aceptación"])
         fecha_mov = st.date_input("Fecha de Movimiento", value=date.today())
         sprint = st.selectbox("Sprint", [""] + list(sprints["Sprint"].unique()))
@@ -111,13 +111,15 @@ st.subheader("🕒 Historial de Cambios")
 historial["Fecha Cambio"] = pd.to_datetime(historial["Fecha Cambio"], errors='coerce')
 historial["Fecha Movimiento"] = pd.to_datetime(historial["Fecha Movimiento"], errors='coerce')
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     filtro_hist_sprint = st.selectbox("📌 Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
 with col2:
     aplicar_fechas = st.checkbox("📅 Filtrar por fechas")
 with col3:
     filtro_id = st.text_input("🔍 Buscar por ID")
+with col4:
+    filtro_id_devops = st.text_input("🔍 Buscar por ID DevOps")
 
 hist_filtrado = historial.copy()
 if filtro_hist_sprint != "Todos":
@@ -131,6 +133,8 @@ if aplicar_fechas:
     ]
 if filtro_id:
     hist_filtrado = hist_filtrado[hist_filtrado["ID"].astype(str).str.contains(filtro_id.strip())]
+if filtro_id_devops:
+    hist_filtrado = hist_filtrado[hist_filtrado["IDDevOps"].astype(str).str.contains(filtro_id_devops.strip())]
 
 st.dataframe(hist_filtrado[columnas_historial], use_container_width=True)
 
@@ -148,6 +152,12 @@ if not resumen.empty:
         Puntos_QA=("Puntos QA", "sum"),
         Puntos_Dev=("Puntos Dev", "sum")
     ).reset_index()
-    st.dataframe(resumen_agg, use_container_width=True)
+
+    resumen_completo = pd.merge(resumen_agg, sprints, how="left", left_on="Sprint", right_on="Sprint")
+    resumen_completo = resumen_completo[[
+        "Sprint", "Total_Solicitudes", "Total_Carryover",
+        "Integrantes QA", "Integrantes Dev", "Fecha Desde", "Fecha Hasta"
+    ]]
+    st.dataframe(resumen_completo, use_container_width=True)
 else:
     st.info("⚠️ No hay datos para mostrar.")
