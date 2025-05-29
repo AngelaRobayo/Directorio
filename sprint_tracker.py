@@ -97,8 +97,6 @@ with st.expander("🆕 Crear Nueva Solicitud"):
                 guardar_csv(historial, "historial.csv")
                 st.success("✅ Solicitud creada.")
 
-
-
 with st.expander("✏️ Modificar Solicitud Existente"):
     with st.form("form_modificar_solicitud"):
         # Ingreso del ID para consulta
