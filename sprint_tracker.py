@@ -153,21 +153,35 @@ st.dataframe(df_filtrado, use_container_width=True)
 
 st.subheader("🕒 Historial de Cambios")
 
-filtro_hist_sprint = st.selectbox("📌 Filtrar por Sprint (historial)", ["Todos"] + list(sprints["Sprint"].unique()))
-filtro_fecha_inicio = st.date_input("📅 Desde", value=date.today().replace(month=1, day=1))
-filtro_fecha_fin = st.date_input("📅 Hasta", value=date.today())
+# Convertir fechas a datetime para evitar errores pyarrow
+historial["Fecha Cambio"] = pd.to_datetime(historial["Fecha Cambio"], errors="coerce")
+historial["Fecha Movimiento"] = pd.to_datetime(historial["Fecha Movimiento"], errors="coerce")
 
+# Filtros
+col1, col2, col3 = st.columns(3)
+with col1:
+    filtro_hist_sprint = st.selectbox("📌 Filtrar por Sprint (opcional)", ["Todos"] + list(sprints["Sprint"].unique()))
+with col2:
+    aplicar_filtro_fecha = st.checkbox("Filtrar por rango de fechas")
+with col3:
+    if aplicar_filtro_fecha:
+        filtro_fecha_inicio = st.date_input("📅 Desde", value=date.today().replace(month=1, day=1))
+        filtro_fecha_fin = st.date_input("📅 Hasta", value=date.today())
+
+# Aplicar filtros solo si están activados
 hist_filtrado = historial.copy()
+
 if filtro_hist_sprint != "Todos":
     hist_filtrado = hist_filtrado[hist_filtrado["Sprint"] == filtro_hist_sprint]
 
-hist_filtrado["Fecha Cambio"] = pd.to_datetime(hist_filtrado["Fecha Cambio"], errors='coerce')
-hist_filtrado = hist_filtrado[
-    (hist_filtrado["Fecha Cambio"] >= pd.to_datetime(filtro_fecha_inicio)) &
-    (hist_filtrado["Fecha Cambio"] <= pd.to_datetime(filtro_fecha_fin))
-]
+if aplicar_filtro_fecha:
+    hist_filtrado = hist_filtrado[
+        (hist_filtrado["Fecha Cambio"] >= pd.to_datetime(filtro_fecha_inicio)) &
+        (hist_filtrado["Fecha Cambio"] <= pd.to_datetime(filtro_fecha_fin))
+    ]
 
-st.dataframe(hist_filtrado[columnas_base + ["Fecha Cambio", "Cambio"]], use_container_width=True)
+# Mostrar historial
+st.dataframe(hist_filtrado[columnas_historial], use_container_width=True)
 
 # ================================
 # Resumen General desde Historial
@@ -175,12 +189,12 @@ st.dataframe(hist_filtrado[columnas_base + ["Fecha Cambio", "Cambio"]], use_cont
 
 st.subheader("📊 Resumen por Sprint (basado en historial)")
 
-hist_copy = hist_filtrado.copy()
-hist_copy["Puntos QA"] = pd.to_numeric(hist_copy["Puntos QA"].replace("No aplica", 0), errors='coerce').fillna(0)
-hist_copy["Puntos Dev"] = pd.to_numeric(hist_copy["Puntos Dev"].replace("No aplica", 0), errors='coerce').fillna(0)
+hist_copia = hist_filtrado.copy()
+hist_copia["Puntos QA"] = pd.to_numeric(hist_copia["Puntos QA"].replace("No aplica", 0), errors="coerce").fillna(0)
+hist_copia["Puntos Dev"] = pd.to_numeric(hist_copia["Puntos Dev"].replace("No aplica", 0), errors="coerce").fillna(0)
 
-if not hist_copy.empty:
-    resumen = hist_copy.groupby("Sprint").agg(
+if not hist_copia.empty:
+    resumen = hist_copia.groupby("Sprint").agg(
         Total_Solicitudes=("ID", "nunique"),
         Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
         Puntos_QA=("Puntos QA", "sum"),
@@ -189,4 +203,4 @@ if not hist_copy.empty:
 
     st.dataframe(resumen, use_container_width=True)
 else:
-    st.info("⚠️ No hay datos para mostrar en el resumen.")
+    st.info("⚠️ No hay datos disponibles para mostrar en el resumen.")
