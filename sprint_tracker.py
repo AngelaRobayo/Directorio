@@ -4,23 +4,6 @@ import os
 from datetime import date, datetime
 
 
-def asegurar_csv(nombre_archivo, columnas):
-    if not os.path.exists(nombre_archivo):
-        df = pd.DataFrame(columns=columnas)
-        df.to_csv(nombre_archivo, index=False)
-    else:
-        df = pd.read_csv(nombre_archivo)
-        for col in columnas:
-            if col not in df.columns:
-                df[col] = ""
-        df.to_csv(nombre_archivo, index=False)
-
-columnas_solicitudes = ["ID", "Solicitud", "Estado", "Fecha Movimiento", "Sprint", "Persona", "Carryover", "Puntos QA", "Puntos Dev"]
-columnas_historial = columnas_solicitudes + ["Fecha Cambio", "Cambio"]
-
-asegurar_csv("sprint_data.csv", columnas_solicitudes)
-asegurar_csv("historial.csv", columnas_historial)
-
 
 st.set_page_config(page_title="Seguimiento de Sprint", layout="wide")
 
