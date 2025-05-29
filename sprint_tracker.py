@@ -116,7 +116,8 @@ with st.expander("✏️ Modificar Solicitud Existente"):
             id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
             tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) and solicitud_data["Tiempo Resolución (h)"] != "" else 0.0)
 
-            if st.form_submit_button("Guardar Cambios"):  # Aquí es donde se guarda la solicitud modificada
+            # Aquí es donde se agrega el botón de submit dentro del formulario
+            if st.form_submit_button("Guardar Cambios"):  # Ahora está dentro del formulario
                 hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 idx = solicitudes[solicitudes["ID"] == int(id_edit)].index[0]
                 solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Puntos Finales", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
@@ -140,11 +141,40 @@ st.subheader("📋 Solicitudes Registradas")
 
 filtro_sprint = st.selectbox("🔎 Filtrar por Sprint", ["Todos"] + list(sprints["Sprint"].unique()))
 filtro_estado = st.selectbox("🔎 Filtrar por Estado", ["Todos"] + sorted(solicitudes["Estado"].unique()))
+filtro_id = st.text_input("🔍 Buscar por ID")
 
-# Mostrar las solicitudes filtradas
+df_filtrado = solicitudes.copy()
 if filtro_sprint != "Todos":
-    solicitudes = solicitudes[solicitudes["Sprint"] == filtro_sprint]
+    df_filtrado = df_filtrado[df_filtrado["Sprint"] == filtro_sprint]
 if filtro_estado != "Todos":
-    solicitudes = solicitudes[solicitudes["Estado"] == filtro_estado]
+    df_filtrado = df_filtrado[df_filtrado["Estado"] == filtro_estado]
+if filtro_id:
+    df_filtrado = df_filtrado[df_filtrado["ID"].astype(str).str.contains(filtro_id.strip())]
 
-st.dataframe(solicitudes)
+st.dataframe(df_filtrado, use_container_width=True)
+
+# Resumen
+st.subheader("📊 Resumen General por Sprint")
+
+resumen = df_filtrado.copy()
+resumen["Puntos QA"] = pd.to_numeric(resumen["Puntos QA"].replace("No aplica", 0), errors="coerce").fillna(0)
+resumen["Puntos Dev"] = pd.to_numeric(resumen["Puntos Dev"].replace("No aplica", 0), errors="coerce").fillna(0)
+resumen["Puntos Finales"] = pd.to_numeric(resumen["Puntos Finales"].replace("No aplica", 0), errors="coerce").fillna(0)  # Agregado
+resumen["Tiempo Resolución (h)"] = pd.to_numeric(resumen["Tiempo Resolución (h)"], errors="coerce").fillna(0)
+
+if not resumen.empty:
+    resumen_agg = resumen.groupby("Sprint").agg(
+        Total_Solicitudes=("ID", "nunique"),
+        Total_Carryover=("Carryover", lambda x: (x == "Sí").sum()),
+        Puntos_QA=("Puntos QA", "sum"),
+        Puntos_Dev=("Puntos Dev", "sum"),
+        Puntos_Finales=("Puntos Finales", "sum"),  # Agregado
+        QA_only=("Compromiso", lambda x: (x == "QA").sum()),
+        Dev_only=("Compromiso", lambda x: (x == "Desarrollo").sum()),
+        Ambos=("Compromiso", lambda x: (x == "Ambos").sum()),
+        Tiempo_Resolucion_Prom=("Tiempo Resolución (h)", "mean")
+    ).reset_index()
+
+    st.dataframe(resumen_agg, use_container_width=True)
+else:
+    st.info("⚠️ No hay datos para mostrar.")
