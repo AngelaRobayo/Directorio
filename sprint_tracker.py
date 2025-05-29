@@ -134,7 +134,7 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                 compromiso = st.selectbox("Compromiso del equipo", ["Desarrollo", "QA", "Ambos"], index=["Desarrollo", "QA", "Ambos"].index(solicitud_data["Compromiso"]))
 
                 id_hu = st.text_input("ID HU Relacionada (opcional)", value=solicitud_data["HU Relacionada"])
-                tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) else 0.0)
+                tiempo_res = st.number_input("Tiempo de Resolución (h)", min_value=0.0, step=0.5, value=float(solicitud_data["Tiempo Resolución (h)"]) if pd.notna(solicitud_data["Tiempo Resolución (h)"]) and solicitud_data["Tiempo Resolución (h)"] != "" else 0.0)
 
                 # Aquí el botón de submit para guardar los cambios
                 submit_button = st.form_submit_button("Guardar Cambios")
