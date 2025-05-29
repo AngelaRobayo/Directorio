@@ -107,6 +107,7 @@ with st.expander("🆕 Crear Nueva Solicitud"):
                 st.success("✅ Solicitud creada.")
 
 # Modificar Solicitud Existente
+# Modificar Solicitud Existente
 with st.expander("✏️ Modificar Solicitud Existente"):
     with st.form("form_modificar_solicitud"):
         # Ingreso del ID para consulta
@@ -145,24 +146,46 @@ with st.expander("✏️ Modificar Solicitud Existente"):
                     if submit_button:
                         hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
-                        # Actualizar la solicitud
-                        idx = solicitudes[solicitudes["ID"] == id_edit].index[0]
-                        solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
-                            estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev), compromiso, id_hu, tiempo_res
-                        ]
+                        # Asegurarse de que idx sea correcto
+                        idx = solicitudes[solicitudes["ID"] == id_edit].index
+                        if len(idx) == 0:
+                            st.error(f"No se encontró la solicitud con ID: {id_edit}")
+                        else:
+                            idx = idx[0]  # Asegurarse de tomar el primer índice
 
-                        # Agregar al historial
-                        historial.loc[len(historial)] = [
-                            id_edit, solicitud_data["Solicitud"], solicitud_data["Tipo Solicitud"], estado, fecha_mov, sprint,
-                            "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev), str(puntos_qa), compromiso, id_hu, tiempo_res, hoy, "Modificado"
-                        ]
-                        
-                        st.session_state.solicitudes = solicitudes
-                        st.session_state.historial = historial
-                        guardar_csv(solicitudes, "sprint_data.csv")
-                        guardar_csv(historial, "historial.csv")
-                        st.success("✅ Solicitud modificada.")
+                            # Mostrar depuración de los cambios que se van a guardar
+                            st.write("Actualizando solicitud con ID:", id_edit)
+                            st.write("Nuevo Estado:", estado)
+                            st.write("Nueva Fecha de Movimiento:", fecha_mov)
+                            st.write("Nuevo Sprint:", sprint)
+                            st.write("Nuevo Carryover:", "Sí" if carryover else "No")
+                            st.write("Nuevo Puntos QA:", puntos_qa)
+                            st.write("Nuevo Puntos Dev:", puntos_dev)
+                            st.write("Nuevo Compromiso:", compromiso)
+                            st.write("Nuevo ID HU Relacionada:", id_hu)
+                            st.write("Nuevo Tiempo de Resolución:", tiempo_res)
 
+                            # Actualizar la solicitud
+                            solicitudes.loc[idx, ["Estado", "Fecha Movimiento", "Sprint", "Carryover", "Puntos QA", "Puntos Dev", "Compromiso", "HU Relacionada", "Tiempo Resolución (h)"]] = [
+                                estado, fecha_mov, sprint, "Sí" if carryover else "No", str(puntos_qa), str(puntos_dev), compromiso, id_hu, tiempo_res
+                            ]
+
+                            # Agregar al historial
+                            historial_reg = solicitudes.loc[[idx]].copy()
+                            historial_reg["Fecha Cambio"] = hoy
+                            historial_reg["Cambio"] = "Modificado"
+                            historial = pd.concat([historial, historial_reg], ignore_index=True)
+
+                            # Actualizar las sesiones de estado
+                            st.session_state.solicitudes = solicitudes
+                            st.session_state.historial = historial
+
+                            # Guardar los datos en los archivos CSV
+                            guardar_csv(solicitudes, "sprint_data.csv")
+                            guardar_csv(historial, "historial.csv")
+
+                            # Mensaje de éxito
+                            st.success("✅ Solicitud modificada exitosamente.")
                 else:
                     st.warning("⚠️ El ID ingresado no existe.")
             else:
